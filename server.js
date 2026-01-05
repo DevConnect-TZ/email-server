@@ -16,6 +16,7 @@ const TO_EMAILS = (process.env.TO_EMAILS || process.env.TO_EMAIL || 'sirtheprogr
   .map((e) => e.trim())
   .filter(Boolean);
 const PORT = process.env.PORT || 5001;
+const START_TIME = Date.now();
 
 // Brand palette (matches Tailwind primary)
 const BRAND = {
@@ -37,6 +38,122 @@ const transporter = nodemailer.createTransport({
     user: SMTP_USER,
     pass: SMTP_PASS,
   },
+});
+
+// Simple status page with themed styling and live uptime counter
+app.get('/', (_req, res) => {
+  const html = `
+  <!doctype html>
+  <html>
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>DevConnect Email Server</title>
+      <style>
+        :root {
+          --bg: ${BRAND.bg};
+          --card: ${BRAND.card};
+          --primary: ${BRAND.primary};
+          --primary-dark: ${BRAND.primaryDark};
+          --border: ${BRAND.border};
+          --text: ${BRAND.text};
+          --muted: ${BRAND.muted};
+        }
+        * { box-sizing: border-box; }
+        body {
+          margin: 0;
+          font-family: 'Inter','Segoe UI',sans-serif;
+          background: var(--bg);
+          color: var(--text);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+        }
+        .card {
+          width: min(640px, 92vw);
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          box-shadow: 0 12px 35px rgba(0,0,0,0.06);
+          overflow: hidden;
+        }
+        .header {
+          background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+          color: #fff;
+          padding: 28px 32px;
+        }
+        .header h1 { margin: 0; font-size: 22px; }
+        .header p { margin: 6px 0 0; color: #fef3c7; font-size: 14px; }
+        .body {
+          padding: 24px 32px 28px;
+        }
+        .pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: #ecfdf3;
+          color: #166534;
+          padding: 10px 14px;
+          border-radius: 999px;
+          font-weight: 600;
+          font-size: 14px;
+          border: 1px solid #bbf7d0;
+        }
+        .muted { color: var(--muted); font-size: 14px; margin-top: 12px; }
+        .uptime {
+          margin-top: 18px;
+          padding: 14px 16px;
+          border: 1px solid var(--border);
+          background: var(--primary)10;
+          border-radius: 12px;
+          font-size: 15px;
+          color: var(--primary-dark);
+        }
+        .uptime strong { color: var(--primary-dark); }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="header">
+          <h1>DevConnect Email Server</h1>
+          <p>SMTP relay for contact, hire, and achievements forms.</p>
+        </div>
+        <div class="body">
+          <div class="pill">● Running</div>
+          <div class="uptime">Uptime: <strong id="uptime">calculating…</strong></div>
+          <div class="muted">Listening on port ${PORT}. Refresh to re-check status.</div>
+        </div>
+      </div>
+      <script>
+        const startedAt = ${START_TIME};
+        const el = document.getElementById('uptime');
+        const format = (ms) => {
+          const totalSeconds = Math.floor(ms / 1000);
+          const days = Math.floor(totalSeconds / 86400);
+          const hours = Math.floor((totalSeconds % 86400) / 3600);
+          const minutes = Math.floor((totalSeconds % 3600) / 60);
+          const seconds = totalSeconds % 60;
+          const parts = [];
+          if (days) parts.push(days + 'd');
+          if (hours) parts.push(hours + 'h');
+          if (minutes) parts.push(minutes + 'm');
+          parts.push(seconds + 's');
+          return parts.join(' ');
+        };
+        const tick = () => {
+          const diff = Date.now() - startedAt;
+          el.textContent = format(diff);
+        };
+        tick();
+        setInterval(tick, 1000);
+      </script>
+    </body>
+  </html>
+  `;
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
 });
 
 /**

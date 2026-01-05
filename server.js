@@ -10,6 +10,11 @@ app.use(express.json());
 const SMTP_USER = process.env.SMTP_USER || 'Devconnecttz@gmail.com';
 const SMTP_PASS = process.env.SMTP_PASS || 'pnirbznpgddqjigb';
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
+const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
+const SMTP_SECURE = process.env.SMTP_SECURE === 'true' || SMTP_PORT === 465;
+const SMTP_CONNECTION_TIMEOUT = Number(process.env.SMTP_CONNECTION_TIMEOUT_MS) || 15000;
+const SMTP_SOCKET_TIMEOUT = Number(process.env.SMTP_SOCKET_TIMEOUT_MS) || 20000;
 // Accept comma-separated list via TO_EMAILS or TO_EMAIL; default to three recipients
 const TO_EMAILS = (process.env.TO_EMAILS || process.env.TO_EMAIL || 'sirtheprogrammer@gmail.com,beastcodes27@gmail.com,galousmgaya@gmail.com')
   .split(',')
@@ -31,13 +36,15 @@ const BRAND = {
 
 // Create a reusable transporter object using Gmail SMTP
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // use STARTTLS
+  host: SMTP_HOST,
+  port: SMTP_PORT,
+  secure: SMTP_SECURE, // true for 465, false for 587 with STARTTLS
   auth: {
     user: SMTP_USER,
     pass: SMTP_PASS,
   },
+  connectionTimeout: SMTP_CONNECTION_TIMEOUT,
+  socketTimeout: SMTP_SOCKET_TIMEOUT,
 });
 
 // Simple status page with themed styling and live uptime counter

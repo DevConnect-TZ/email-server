@@ -1,27 +1,37 @@
+// Load environment variables first
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- SMTP configuration (defaults to provided Gmail app password) ---
-const SMTP_USER = process.env.SMTP_USER || 'Devconnecttz@gmail.com';
-const SMTP_PASS = process.env.SMTP_PASS || 'pnirbznpgddqjigb';
-const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
-const SMTP_SECURE = process.env.SMTP_SECURE === 'true' || SMTP_PORT === 465;
-const SMTP_CONNECTION_TIMEOUT = Number(process.env.SMTP_CONNECTION_TIMEOUT_MS) || 15000;
-const SMTP_SOCKET_TIMEOUT = Number(process.env.SMTP_SOCKET_TIMEOUT_MS) || 20000;
-// Accept comma-separated list via TO_EMAILS or TO_EMAIL; default to three recipients
+// --- Configuration ---
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const FROM_EMAIL = process.env.FROM_EMAIL || 'support@devconnecttz.site'; // Change after domain verification
 const TO_EMAILS = (process.env.TO_EMAILS || process.env.TO_EMAIL || 'sirtheprogrammer@gmail.com,beastcodes27@gmail.com,galousmgaya@gmail.com')
   .split(',')
   .map((e) => e.trim())
   .filter(Boolean);
 const PORT = process.env.PORT || 5001;
 const START_TIME = Date.now();
+
+// Validate API key before initializing Resend
+if (!RESEND_API_KEY) {
+  console.error('\n❌ ERROR: RESEND_API_KEY is not set!\n');
+  console.error('Please create a .env file in the email-server directory with:');
+  console.error('  RESEND_API_KEY=your_resend_api_key_here\n');
+  console.error('Or set it as an environment variable before starting the server:\n');
+  console.error('  export RESEND_API_KEY=your_resend_api_key_here');
+  console.error('  npm start\n');
+  process.exit(1);
+}
+
+// Initialize Resend
+const resend = new Resend(RESEND_API_KEY);
 
 // Brand palette (matches Tailwind primary)
 const BRAND = {
@@ -33,19 +43,6 @@ const BRAND = {
   text: '#1f2937',
   muted: '#4b5563',
 };
-
-// Create a reusable transporter object using Gmail SMTP
-const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
-  port: SMTP_PORT,
-  secure: SMTP_SECURE, // true for 465, false for 587 with STARTTLS
-  auth: {
-    user: SMTP_USER,
-    pass: SMTP_PASS,
-  },
-  connectionTimeout: SMTP_CONNECTION_TIMEOUT,
-  socketTimeout: SMTP_SOCKET_TIMEOUT,
-});
 
 // Simple status page with themed styling and live uptime counter
 app.get('/', (_req, res) => {
@@ -124,12 +121,12 @@ app.get('/', (_req, res) => {
       <div class="card">
         <div class="header">
           <h1>DevConnect Email Server</h1>
-          <p>SMTP relay for contact, hire, and achievements forms.</p>
+          <p>Resend API relay for contact, hire, and achievements forms.</p>
         </div>
         <div class="body">
           <div class="pill">● Running</div>
           <div class="uptime">Uptime: <strong id="uptime">calculating…</strong></div>
-          <div class="muted">Listening on port ${PORT}. Refresh to re-check status.</div>
+          <div class="muted">Listening on port ${PORT}. Using Resend API (HTTPS).</div>
         </div>
       </div>
       <script>
@@ -223,17 +220,17 @@ const buildEmailTemplate = ({ title, subtitle, fields }) => {
 };
 
 /**
- * Send an email using the shared transporter.
+ * Send an email using Resend API.
  */
-const sendEmail = async ({ subject, text, html }) => {
-  const info = await transporter.sendMail({
-    from: `"DevConnect TZ" <${SMTP_FROM}>`,
+const sendEmail = async ({ subject, text, html, replyTo }) => {
+  const data = await resend.emails.send({
+    from: `DevConnect TZ <${FROM_EMAIL}>`,
     to: TO_EMAILS,
     subject,
-    text,
     html,
+    replyTo: replyTo || undefined,
   });
-  return info;
+  return data;
 };
 
 /**
@@ -260,9 +257,10 @@ app.post('/api/contact', async (req, res) => {
           { label: 'Message', value: message },
         ],
       }),
+      replyTo: email,
     });
 
-    res.json({ success: true, messageId: info.messageId });
+    res.json({ success: true, messageId: info.id });
   } catch (error) {
     console.error('Contact email error:', error);
     res.status(500).json({ success: false, error: 'Failed to send contact email' });
@@ -295,9 +293,10 @@ app.post('/api/hire', async (req, res) => {
           { label: 'Description', value: description },
         ],
       }),
+      replyTo: email,
     });
 
-    res.json({ success: true, messageId: info.messageId });
+    res.json({ success: true, messageId: info.id });
   } catch (error) {
     console.error('Hire request email error:', error);
     res.status(500).json({ success: false, error: 'Failed to send hire request email' });
@@ -328,9 +327,10 @@ app.post('/api/achievement', async (req, res) => {
           { label: 'Message', value: message },
         ],
       }),
+      replyTo: email,
     });
 
-    res.json({ success: true, messageId: info.messageId });
+    res.json({ success: true, messageId: info.id });
   } catch (error) {
     console.error('Achievements email error:', error);
     res.status(500).json({ success: false, error: 'Failed to send achievements email' });
@@ -343,5 +343,5 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Email service listening on http://localhost:${PORT}`);
+  console.log(`Using Resend API (bypasses SMTP port blocks)`);
 });
-
